@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Eitan's Flashcard Studio</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs" type="module"></script>
+<style>
+  :root {
+    --text:#f3f4f8; --text-dim:rgba(243,244,248,0.62);
+    --glass:rgba(255,255,255,0.10); --glass-strong:rgba(255,255,255,0.16);
+    --glass-edge:rgba(255,255,255,0.22); --solid:#1c1d2b; --solid-soft:#25263a;
+    --tint:#0a84ff; --tint-2:#5e5ce6; --green:#30d158; --red:#ff453a; --radius:26px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    font-family:'Manrope',-apple-system,BlinkMacSystemFont,sans-serif;color:var(--text);
+    min-height:100%;
+    background:
+      radial-gradient(900px 700px at 12% 0%, rgba(94,92,230,0.55), transparent 60%),
+      radial-gradient(800px 800px at 95% 15%, rgba(10,132,255,0.45), transparent 55%),
+      radial-gradient(900px 700px at 60% 100%, rgba(255,55,95,0.35), transparent 55%),
+      linear-gradient(180deg,#0c0d18,#141526);
+    background-attachment:fixed;-webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:940px;margin:0 auto;padding:30px 18px 130px;}
+  header{text-align:center;padding:14px 0 4px;}
+  header h1{font-weight:800;font-size:clamp(1.8rem,5.5vw,2.7rem);letter-spacing:-0.03em;
+    background:linear-gradient(180deg,#fff,#c9ccff);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  header p{color:var(--text-dim);font-size:0.98rem;margin-top:4px;font-weight:500;}
+  .glass{background:var(--glass);backdrop-filter:blur(28px) saturate(180%);
+    -webkit-backdrop-filter:blur(28px) saturate(180%);border:1px solid var(--glass-edge);
+    border-radius:var(--radius);box-shadow:0 10px 40px rgba(0,0,0,0.35),inset 0 1px 0 rgba(255,255,255,0.18);}
+  .tabs{display:flex;gap:4px;padding:5px;margin:24px auto 26px;max-width:620px;}
+  .tab{flex:1;font-family:inherit;font-weight:700;font-size:0.8rem;color:var(--text-dim);
+    background:transparent;border:none;padding:10px 4px;border-radius:16px;cursor:pointer;
+    transition:all .22s cubic-bezier(.4,0,.2,1);}
+  .tab.active{color:#fff;background:linear-gradient(180deg,var(--glass-strong),rgba(255,255,255,0.06));
+    border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 rgba(255,255,255,0.25),0 4px 14px rgba(0,0,0,0.3);}
+  .panel{display:none;}
+  .panel.active{display:block;animation:rise .32s cubic-bezier(.4,0,.2,1);}
+  @keyframes rise{from{opacity:0;transform:translateY(10px) scale(.99);}to{opacity:1;transform:none;}}
+  .card-pad{padding:22px 20px;}
+  label.field{display:block;font-weight:700;font-size:0.95rem;margin-bottom:6px;}
+  .hint{color:var(--text-dim);font-size:0.86rem;margin-bottom:12px;line-height:1.45;}
+  .hint b{color:var(--text);font-weight:700;}
+  textarea{width:100%;min-height:200px;background:var(--solid);color:var(--text);
+    border:1px solid var(--glass-edge);border-radius:18px;padding:14px 16px;
+    font-family:inherit;font-size:0.98rem;line-height:1.55;resize:vertical;}
+  textarea:focus{outline:2px solid var(--tint);}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px;}
+  .btn{font-family:inherit;font-weight:700;font-size:0.92rem;color:#fff;
+    background:linear-gradient(180deg,var(--tint),#0066d6);border:1px solid rgba(255,255,255,0.25);
+    padding:12px 22px;border-radius:999px;cursor:pointer;
+    box-shadow:0 6px 20px rgba(10,132,255,0.4),inset 0 1px 0 rgba(255,255,255,0.4);
+    transition:transform .12s ease,filter .15s ease;}
+  .btn:hover{filter:brightness(1.1);}
+  .btn:active{transform:scale(0.96);}
+  .btn.glassbtn{background:var(--glass-strong);box-shadow:inset 0 1px 0 rgba(255,255,255,0.25);
+    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);}
+  .btn.danger{background:linear-gradient(180deg,var(--red),#c8281f);box-shadow:0 6px 20px rgba(255,69,58,0.4);}
+  .btn:disabled{opacity:0.45;cursor:default;}
+  .count{color:var(--text-dim);font-size:0.88rem;font-weight:600;}
+  .steps{display:flex;flex-direction:column;gap:10px;margin:6px 0 4px;}
+  .step{display:flex;gap:12px;align-items:flex-start;background:var(--solid);
+    border:1px solid var(--glass-edge);border-radius:14px;padding:12px 14px;}
+  .step .n{flex-shrink:0;width:26px;height:26px;border-radius:50%;
+    background:linear-gradient(180deg,var(--tint),#0066d6);color:#fff;font-weight:800;
+    font-size:0.85rem;display:flex;align-items:center;justify-content:center;}
+  .step .txt{font-size:0.9rem;line-height:1.5;font-weight:500;}
+  .step .txt b{font-weight:800;color:var(--text);}
+  .codebox{background:#0c0d18;border:1px solid var(--glass-edge);border-radius:12px;
+    padding:11px 13px;margin-top:7px;font-size:0.82rem;color:#9fe1cb;font-weight:600;
+    line-height:1.5;white-space:pre-wrap;}
+  .pdfzone{border:2px dashed var(--glass-edge);border-radius:16px;padding:18px;text-align:center;
+    background:rgba(255,255,255,0.03);cursor:pointer;transition:all .18s;margin-top:6px;}
+  .pdfzone:hover{border-color:var(--tint);background:rgba(10,132,255,0.1);}
+  .pdfzone .pz-t{font-weight:700;font-size:0.92rem;}
+  .pdfzone .pz-s{color:var(--text-dim);font-size:0.8rem;margin-top:3px;font-weight:500;}
+  .status{margin-top:10px;font-size:0.84rem;font-weight:600;color:var(--text-dim);min-height:1.3em;}
+  .status.work{color:var(--tint);}
+  .status.warn{color:#ffd60a;}
+  .status.good{color:var(--green);}
+  .spin{display:inline-block;width:13px;height:13px;border:2px solid rgba(255,255,255,0.3);
+    border-top-color:var(--tint);border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px;margin-right:6px;}
+  @keyframes sp{to{transform:rotate(360deg);}}
+  .photo-strip{margin-top:16px;}
+  .photo-strip h3{font-size:0.9rem;font-weight:700;margin-bottom:8px;}
+  .attach-row{display:flex;align-items:center;gap:12px;padding:9px 12px;margin-bottom:8px;
+    background:var(--solid);border-radius:14px;border:1px solid var(--glass-edge);}
+  .attach-row .name{flex:1;font-weight:600;font-size:0.92rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .attach-row .thumb{width:42px;height:42px;border-radius:9px;object-fit:cover;
+    background:var(--solid-soft);flex-shrink:0;border:1px solid var(--glass-edge);}
+  .mini{font-family:inherit;font-weight:700;font-size:0.8rem;padding:7px 13px;border-radius:999px;
+    cursor:pointer;border:1px solid var(--glass-edge);background:var(--glass-strong);color:#fff;}
+  .mini.clear{color:var(--red);}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-top:20px;}
+  .fcard{border-radius:22px;overflow:hidden;cursor:pointer;background:var(--solid-soft);
+    border:1px solid var(--glass-edge);box-shadow:0 8px 26px rgba(0,0,0,0.4);
+    transition:transform .14s ease,box-shadow .15s ease;display:flex;flex-direction:column;}
+  .fcard:hover{transform:translateY(-4px);box-shadow:0 14px 34px rgba(0,0,0,0.5);}
+  .fcard .photo{width:100%;height:130px;object-fit:cover;
+    background:linear-gradient(135deg,var(--tint-2),var(--tint));display:block;}
+  .fcard .body{padding:14px 15px 16px;}
+  .fcard .num{font-size:0.72rem;color:var(--text-dim);font-weight:700;}
+  .fcard .term{font-weight:800;font-size:1.2rem;letter-spacing:-0.02em;margin-top:2px;}
+  .fcard .def{margin-top:7px;color:var(--text-dim);font-size:0.9rem;line-height:1.45;font-weight:500;}
+  .fcard .def.hidden{filter:blur(8px);user-select:none;}
+  .empty{text-align:center;color:var(--text-dim);padding:46px 20px;font-weight:600;}
+  .quizbox{padding:30px 24px;text-align:center;}
+  .progress{color:var(--text-dim);font-weight:700;font-size:0.88rem;margin-bottom:14px;}
+  .qphoto{width:100%;max-width:320px;height:190px;object-fit:cover;border-radius:18px;
+    margin:0 auto 16px;display:block;border:1px solid var(--glass-edge);}
+  .prompt-label{font-size:0.74rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--tint);font-weight:800;}
+  .prompt{font-weight:800;font-size:clamp(1.5rem,5vw,2.3rem);letter-spacing:-0.02em;margin:6px 0 18px;}
+  .answer{font-size:1.12rem;min-height:1.5em;color:var(--green);font-weight:700;margin-bottom:20px;}
+  .quiz-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;}
+  .scorebar{display:flex;gap:20px;justify-content:center;margin-top:18px;color:var(--text-dim);
+    font-weight:700;font-size:0.88rem;}
+  .scorebar b{color:var(--text);}
+  .big{font-weight:800;font-size:3.6rem;letter-spacing:-0.03em;
+    background:linear-gradient(180deg,var(--green),#1a9c3e);
+    -webkit-background-clip:text;background-clip:text;color:transparent;}
+  .modeline{padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  select{font-family:inherit;font-weight:700;font-size:0.9rem;color:var(--text);
+    background:var(--solid);border:1px solid var(--glass-edge);border-radius:12px;padding:9px 12px;}
+  .opt-grid{display:flex;flex-wrap:wrap;gap:18px;}
+  .opt-group{min-width:180px;}
+  .opt-group .field{margin-bottom:8px;}
+  .seg{display:flex;gap:4px;background:var(--solid);border-radius:12px;padding:4px;}
+  .seg button{flex:1;font-family:inherit;font-weight:700;font-size:0.82rem;color:var(--text-dim);
+    background:transparent;border:none;padding:8px 6px;border-radius:9px;cursor:pointer;transition:all .18s;}
+  .seg button.on{color:#fff;background:linear-gradient(180deg,var(--tint),#0066d6);}
+  .preview-note{margin-top:16px;padding:12px 14px;border-radius:14px;background:var(--solid);
+    color:var(--text-dim);font-size:0.84rem;line-height:1.5;font-weight:500;}
+  .preview-note b{color:var(--text);}
+
+  /* ============ PRINT ============
+     Reliable approach:
+       - No @page margin override (lets browser use its default printable area).
+       - Sheet is a normal flex container, not exact-inch dimensioned.
+       - Each card has explicit inch dimensions and page-break-inside:avoid.
+       - Card-level page breaks instead of sheet-level — way more compatible.
+  */
+  #printSheet { display: none; }
+  @media print {
+    body { background:#fff !important; }
+    .wrap { display:none !important; }
+    #printSheet {
+      display: flex !important;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-content: flex-start;
+      gap: 0;
+    }
+    .pcard {
+      box-sizing: border-box;
+      border: 1.5px solid #000;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      text-align: center; color: #000;
+      padding: 0.22in 0.18in;
+      page-break-inside: avoid;
+      break-inside: avoid;
+      overflow: hidden;
+    }
+    .pcard .pterm { font-weight: 800; letter-spacing: -0.01em; line-height: 1.18; }
+    .pcard .pdef { font-weight: 400; color: #000; line-height: 1.4; margin-top: 0.06in; }
+    .pcard .pphoto { max-width: 90%; max-height: 1.3in; object-fit: contain; margin-bottom: 0.08in; }
+    .pcard.blank { border-color: #000; }
+    /* Force the back-side page to start on a fresh sheet */
+    .page-break { width: 100%; page-break-after: always; break-after: page; height: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Eitan's Flashcard Studio</h1>
+    <p>build, study, print &amp; get quizzed on any word list</p>
+  </header>
+
+  <div class="tabs glass">
+    <button class="tab active" data-tab="import">Import</button>
+    <button class="tab" data-tab="build">Build</button>
+    <button class="tab" data-tab="study">Study</button>
+    <button class="tab" data-tab="print">Print Cards</button>
+    <button class="tab" data-tab="quiz">Quiz Me</button>
+  </div>
+
+  <section class="panel active" id="import">
+    <div class="glass card-pad">
+      <label class="field">Got a worksheet? Turn it into a list first</label>
+      <p class="hint">This app builds cards from a typed list. To get a list out of a photo or worksheet, use a free text-reading tool — then paste the result here.</p>
+      <div class="steps">
+        <div class="step">
+          <div class="n">1</div>
+          <div class="txt"><b>Take a photo</b> of your worksheet, or have the file ready on your device.</div>
+        </div>
+        <div class="step">
+          <div class="n">2</div>
+          <div class="txt">
+            <b>Ask an AI or OCR tool to read it.</b> Open Claude, ChatGPT, Google Lens, or your phone's
+            built-in text scanner, add the photo, and ask it to list the words. A prompt that works well:
+            <div class="codebox">Read this worksheet and list every word with its meaning, one pair per line, like:  word — meaning</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="n">3</div>
+          <div class="txt"><b>Copy the list it gives you</b> and paste it in the box below. Give it a quick read to fix anything the reader got wrong — then send it to Build.</div>
+        </div>
+      </div>
+
+      <label class="field" style="margin-top:16px;">Paste your list here</label>
+      <textarea id="importText" placeholder="חוֹרֵשׁ — plowing&#10;זוֹרֵעַ — planting&#10;קוֹצֵר — harvesting&#10;..."></textarea>
+      <div class="row">
+        <button class="btn" id="useListBtn">Send to Build →</button>
+        <span class="count" id="importCount"></span>
+      </div>
+
+      <div class="preview-note" style="margin-top:18px;">
+        <b>Have a PDF instead?</b> If it's a normal PDF with selectable text (not a scan), drop it
+        below and the words are pulled out automatically — no other tool needed.
+      </div>
+      <div class="pdfzone" id="pdfzone">
+        <div class="pz-t">Drop a PDF here, or tap to choose</div>
+        <div class="pz-s">Works for PDFs with real text · scanned PDFs need step 2 above</div>
+      </div>
+      <div class="status" id="importStatus"></div>
+    </div>
+  </section>
+
+  <section class="panel" id="build">
+    <div class="glass card-pad">
+      <label class="field" for="input">Your word list</label>
+      <p class="hint">One card per line. Separate word and meaning with a dash, colon, comma, or tab — e.g. <b>ephemeral — lasting a very short time</b>. A word on its own works too.</p>
+      <textarea id="input" placeholder="ephemeral — lasting a very short time&#10;ubiquitous: present everywhere"></textarea>
+      <div class="row">
+        <button class="btn" id="genBtn">Make Flashcards</button>
+        <button class="btn glassbtn" id="sampleBtn">Load Sample</button>
+        <span class="count" id="buildCount"></span>
+      </div>
+      <div class="photo-strip" id="photoStrip" style="display:none;">
+        <h3>Attach a photo to any card <span style="color:var(--text-dim);font-weight:600;">(optional)</span></h3>
+        <div id="attachList"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="study">
+    <div class="glass card-pad">
+      <div class="row" style="margin-top:0">
+        <button class="btn glassbtn" id="toggleDefs">Hide Definitions</button>
+        <button class="btn glassbtn" id="shuffleBtn">Shuffle</button>
+        <span class="count" id="studyCount"></span>
+      </div>
+      <p class="hint" style="margin-top:12px;margin-bottom:0;">Tap a card to flip its definition. Head to <b>Print Cards</b> to make a cut-out sheet.</p>
+    </div>
+    <div class="grid" id="cardGrid"></div>
+  </section>
+
+  <section class="panel" id="print">
+    <div class="glass card-pad">
+      <label class="field">Print layout</label>
+      <p class="hint">Pick your options, then print. In your browser's print dialog: <b>Scale: 100%</b>, leave margins at their default ("Default" or "Normal" — <i>not</i> "None"). To save a PDF, choose "Save as PDF" as the destination.</p>
+      <div class="opt-grid">
+        <div class="opt-group">
+          <div class="field">Sides</div>
+          <div class="seg" id="segSides">
+            <button data-v="double" class="on">Double-sided</button>
+            <button data-v="single">Single-sided</button>
+          </div>
+        </div>
+        <div class="opt-group">
+          <div class="field">Card size</div>
+          <div class="seg" id="segSize">
+            <button data-v="3x5" class="on">3 × 5 in</button>
+            <button data-v="4x6">4 × 6 in</button>
+            <button data-v="2.5x3.5">2.5 × 3.5 in</button>
+          </div>
+        </div>
+        <div class="opt-group">
+          <div class="field">Paper</div>
+          <div class="seg" id="segPaper">
+            <button data-v="letter" class="on">Letter</button>
+            <button data-v="a4">A4</button>
+          </div>
+        </div>
+      </div>
+      <div class="preview-note" id="previewNote"></div>
+      <div class="row">
+        <button class="btn" id="printBtn">Print / Save as PDF</button>
+        <span class="count" id="printCount"></span>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="quiz">
+    <div class="glass modeline">
+      <label class="field" for="quizMode" style="margin:0;">Show me the</label>
+      <select id="quizMode">
+        <option value="term">word — I recall the meaning</option>
+        <option value="def">meaning — I recall the word</option>
+        <option value="photo">photo — I recall the word</option>
+      </select>
+    </div>
+    <div class="glass" id="quizArea"></div>
+  </section>
+</div>
+
+<div id="printSheet"></div>
+
+<input type="file" id="fileInput" accept="image/*" style="display:none;">
+<input type="file" id="pdfInput" accept=".pdf" style="display:none;">
+
+<script type="module">
+  import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs";
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs";
+  window.__pdfjs = pdfjsLib;
+</script>
+
+<script>
+(function () {
+  "use strict";
+
+  var cards = [];
+  var deck = [];
+  var qi = 0, right = 0, wrong = 0, revealed = false;
+  var pendingPhotoIndex = -1;
+  var printOpts = { sides:"double", size:"3x5", paper:"letter" };
+
+  // card sizes in inches, plus the font sizes that fit them well
+  var SIZES = {
+    "3x5":     { w:5,   h:3,   term:"19pt", def:"11pt"   },
+    "4x6":     { w:6,   h:4,   term:"24pt", def:"13pt"   },
+    "2.5x3.5": { w:3.5, h:2.5, term:"15pt", def:"9.5pt"  }
+  };
+  // paper, with assumed printable area (subtracting typical printer margins)
+  // these are conservative so the grid never overflows
+  var PAPER = {
+    letter: { w:8.5,  h:11,    safeW:8.0,  safeH:10.5 },
+    a4:     { w:8.27, h:11.69, safeW:7.77, safeH:11.19 }
+  };
+
+  function parseInput(text) {
+    var out = [];
+    text.split(/\r?\n/).forEach(function (raw) {
+      var line = raw.trim();
+      if (!line) return;
+      var m = line.match(/^(.+?)\s*(?:[\u2014\u2013]|\s-\s|[:\t])\s*(.+)$/);
+      if (!m) m = line.match(/^([^,]+),\s*(.+)$/);
+      if (m) out.push({ term:m[1].trim(), def:m[2].trim(), photo:null });
+      else out.push({ term:line, def:"", photo:null });
+    });
+    return out;
+  }
+
+  var tabs = document.querySelectorAll(".tab");
+  var panels = document.querySelectorAll(".panel");
+  tabs.forEach(function (t) { t.addEventListener("click", function () { goTab(t.dataset.tab); }); });
+  function goTab(name) {
+    tabs.forEach(function (x) { x.classList.toggle("active", x.dataset.tab === name); });
+    panels.forEach(function (p) { p.classList.toggle("active", p.id === name); });
+    if (name === "quiz") startQuiz();
+    if (name === "study") renderCards();
+    if (name === "print") updatePrintInfo();
+  }
+
+  // ============ IMPORT ============
+  var importText = document.getElementById("importText");
+  var importCount = document.getElementById("importCount");
+  var importStatus = document.getElementById("importStatus");
+  var pdfzone = document.getElementById("pdfzone");
+  var pdfInput = document.getElementById("pdfInput");
+
+  function setStatus(html, kind) {
+    importStatus.innerHTML = html || "";
+    importStatus.className = "status" + (kind ? " " + kind : "");
+  }
+  importText.addEventListener("input", function () {
+    var n = importText.value.split(/\n/).filter(function (l) { return l.trim(); }).length;
+    importCount.textContent = n ? n + " line(s)" : "";
+  });
+  document.getElementById("useListBtn").addEventListener("click", function () {
+    var txt = importText.value.trim();
+    if (!txt) { setStatus("Paste a list into the box first.", "warn"); return; }
+    document.getElementById("input").value = txt;
+    refreshBuildCount();
+    goTab("build");
+  });
+  pdfzone.addEventListener("click", function () { pdfInput.click(); });
+  pdfInput.addEventListener("change", function () {
+    if (pdfInput.files[0]) loadPdf(pdfInput.files[0]);
+    pdfInput.value = "";
+  });
+  ["dragenter","dragover"].forEach(function (ev) {
+    pdfzone.addEventListener(ev, function (e) { e.preventDefault(); pdfzone.style.borderColor = "var(--tint)"; });
+  });
+  ["dragleave","drop"].forEach(function (ev) {
+    pdfzone.addEventListener(ev, function (e) { e.preventDefault(); pdfzone.style.borderColor = ""; });
+  });
+  pdfzone.addEventListener("drop", function (e) {
+    var f = e.dataTransfer.files[0];
+    if (f) loadPdf(f);
+  });
+  function loadPdf(file) {
+    var name = (file.name || "").toLowerCase();
+    if (file.type !== "application/pdf" && !name.endsWith(".pdf")) {
+      setStatus("That's not a PDF. For photos, use steps 1–3 above.", "warn"); return;
+    }
+    setStatus('<span class="spin"></span>Reading PDF…', "work");
+    var reader = new FileReader();
+    reader.onload = function () {
+      var pdfjs = window.__pdfjs;
+      if (!pdfjs) { setStatus("PDF engine still loading — drop the file again in a moment.", "warn"); return; }
+      var data = new Uint8Array(reader.result);
+      pdfjs.getDocument({ data:data }).promise.then(function (pdf) {
+        var chunks = [], done = 0, pageCount = pdf.numPages;
+        for (var i = 1; i <= pageCount; i++) {
+          (function (n) {
+            pdf.getPage(n).then(function (page) {
+              page.getTextContent().then(function (tc) {
+                chunks[n-1] = tc.items.map(function (it) { return it.str; }).join(" ");
+                done++;
+                if (done === pageCount) finishPdf(chunks);
+              });
+            });
+          })(i);
+        }
+      }).catch(function () {
+        setStatus("Couldn't read that PDF. If it's a scan, use steps 1–3 above instead.", "warn");
+      });
+    };
+    reader.readAsArrayBuffer(file);
+  }
+  function finishPdf(chunks) {
+    var all = chunks.join("\n").replace(/[ \t]+/g, " ").trim();
+    if (all.replace(/\s/g, "").length > 12) {
+      importText.value = all;
+      importText.dispatchEvent(new Event("input"));
+      setStatus("Text pulled from the PDF. Tidy it so each line is one  word — meaning  pair, then Send to Build.", "good");
+    } else {
+      setStatus("This PDF has no selectable text — it's a scan. Use steps 1–3 above to read it instead.", "warn");
+    }
+  }
+
+  // ============ BUILD ============
+  var input = document.getElementById("input");
+  document.getElementById("sampleBtn").addEventListener("click", function () {
+    input.value =
+      "ephemeral \u2014 lasting a very short time\n" +
+      "ubiquitous \u2014 present, appearing, or found everywhere\n" +
+      "gregarious \u2014 sociable and fond of the company of others\n" +
+      "laconic \u2014 using very few words; terse\n" +
+      "sanguine \u2014 optimistic, especially in a difficult situation";
+    refreshBuildCount();
+  });
+  input.addEventListener("input", refreshBuildCount);
+  function refreshBuildCount() {
+    var n = input.value.split(/\n/).filter(function (l) { return l.trim(); }).length;
+    document.getElementById("buildCount").textContent = n ? n + " line(s)" : "";
+  }
+
+  document.getElementById("genBtn").addEventListener("click", function () {
+    var fresh = parseInput(input.value);
+    if (!fresh.length) {
+      document.getElementById("buildCount").textContent = "Add some words first.";
+      return;
+    }
+    var photoByTerm = {};
+    cards.forEach(function (c) { if (c.photo) photoByTerm[c.term] = c.photo; });
+    fresh.forEach(function (c) { if (photoByTerm[c.term]) c.photo = photoByTerm[c.term]; });
+    cards = fresh;
+    document.getElementById("buildCount").textContent = cards.length + " card(s) ready";
+    renderAttachList();
+    renderCards();
+    updatePrintInfo();
+  });
+
+  var fileInput = document.getElementById("fileInput");
+  fileInput.addEventListener("change", function () {
+    var file = fileInput.files[0];
+    if (!file || pendingPhotoIndex < 0) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      shrinkImage(reader.result, function (dataUrl) {
+        cards[pendingPhotoIndex].photo = dataUrl;
+        renderAttachList(); renderCards();
+      });
+    };
+    reader.readAsDataURL(file);
+    fileInput.value = "";
+  });
+  function shrinkImage(dataUrl, cb) {
+    var img = new Image();
+    img.onload = function () {
+      var max = 700, w = img.width, h = img.height;
+      if (w > max || h > max) {
+        if (w > h) { h = Math.round(h*max/w); w = max; }
+        else { w = Math.round(w*max/h); h = max; }
+      }
+      var canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = h;
+      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+      cb(canvas.toDataURL("image/jpeg", 0.85));
+    };
+    img.onerror = function () { cb(dataUrl); };
+    img.src = dataUrl;
+  }
+  function renderAttachList() {
+    var strip = document.getElementById("photoStrip");
+    var list = document.getElementById("attachList");
+    if (!cards.length) { strip.style.display = "none"; return; }
+    strip.style.display = "block";
+    list.innerHTML = "";
+    cards.forEach(function (c, i) {
+      var row = document.createElement("div");
+      row.className = "attach-row";
+      var thumb = c.photo ? '<img class="thumb" src="'+c.photo+'" alt="">' : '<div class="thumb"></div>';
+      row.innerHTML = thumb +
+        '<span class="name">' + esc(c.term) + '</span>' +
+        '<button class="mini" data-add="'+i+'">' + (c.photo ? "Replace" : "Add photo") + '</button>' +
+        (c.photo ? '<button class="mini clear" data-del="'+i+'">Remove</button>' : '');
+      list.appendChild(row);
+    });
+    list.querySelectorAll("[data-add]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        pendingPhotoIndex = parseInt(b.dataset.add,10);
+        fileInput.click();
+      });
+    });
+    list.querySelectorAll("[data-del]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        cards[parseInt(b.dataset.del,10)].photo = null;
+        renderAttachList(); renderCards();
+      });
+    });
+  }
+
+  // ============ STUDY ============
+  var defsHidden = false;
+  function renderCards() {
+    var grid = document.getElementById("cardGrid");
+    grid.innerHTML = "";
+    if (!cards.length) {
+      grid.innerHTML = '<div class="empty">No cards yet — build some on the Build tab.</div>';
+      document.getElementById("studyCount").textContent = "";
+      return;
+    }
+    cards.forEach(function (c, i) {
+      var el = document.createElement("div");
+      el.className = "fcard";
+      var photo = c.photo ? '<img class="photo" src="'+c.photo+'" alt="">' : '';
+      var defClass = "def" + (defsHidden ? " hidden" : "");
+      el.innerHTML = photo +
+        '<div class="body"><div class="num">' + (i+1) + '</div>' +
+        '<div class="term">' + esc(c.term) + '</div>' +
+        '<div class="' + defClass + '">' + esc(c.def || "—") + '</div></div>';
+      el.addEventListener("click", function () {
+        el.querySelector(".def").classList.toggle("hidden");
+      });
+      grid.appendChild(el);
+    });
+    document.getElementById("studyCount").textContent = cards.length + " card(s)";
+  }
+  document.getElementById("toggleDefs").addEventListener("click", function () {
+    defsHidden = !defsHidden;
+    this.textContent = defsHidden ? "Show Definitions" : "Hide Definitions";
+    renderCards();
+  });
+  document.getElementById("shuffleBtn").addEventListener("click", function () {
+    shuffle(cards); renderCards();
+  });
+
+  // ============ PRINT ============
+  function wireSeg(id, key) {
+    var seg = document.getElementById(id);
+    seg.querySelectorAll("button").forEach(function (b) {
+      b.addEventListener("click", function () {
+        seg.querySelectorAll("button").forEach(function (x) { x.classList.remove("on"); });
+        b.classList.add("on");
+        printOpts[key] = b.dataset.v;
+        updatePrintInfo();
+      });
+    });
+  }
+  wireSeg("segSides","sides");
+  wireSeg("segSize","size");
+  wireSeg("segPaper","paper");
+
+  function gridFit() {
+    var sz = SIZES[printOpts.size];
+    var pp = PAPER[printOpts.paper];
+    // use the safe printable area, not raw paper size
+    var cols = Math.max(1, Math.floor(pp.safeW / sz.w));
+    var rows = Math.max(1, Math.floor(pp.safeH / sz.h));
+    return { cols:cols, rows:rows, per:cols*rows, sz:sz, pp:pp };
+  }
+
+  function updatePrintInfo() {
+    var note = document.getElementById("previewNote");
+    var pc = document.getElementById("printCount");
+    if (!cards.length) {
+      note.innerHTML = "Build some flashcards first — then come back here to lay them out for printing.";
+      pc.textContent = "";
+      return;
+    }
+    var f = gridFit();
+    var faceSheets = Math.ceil(cards.length / f.per);
+    var totalSheets = printOpts.sides === "double" ? faceSheets*2 : faceSheets;
+    var sideText = printOpts.sides === "double"
+      ? "Word pages and answer pages alternate. Print double-sided, flipping on the <b>long edge</b> — answer columns are mirrored so each definition lands behind its word."
+      : "Each card shows the word and its answer together on one face — print, cut, done.";
+    note.innerHTML =
+      "<b>" + cards.length + " cards</b> · " + f.cols + "×" + f.rows +
+      " grid (<b>" + f.per + " per page</b>) · <b>" + totalSheets + " page(s)</b> total.<br>" + sideText;
+    pc.textContent = totalSheets + " page(s)";
+  }
+
+  function buildPrintSheet() {
+    var host = document.getElementById("printSheet");
+    host.innerHTML = "";
+    if (!cards.length) return;
+    var f = gridFit();
+    var sz = f.sz, per = f.per, cols = f.cols;
+    var pages = Math.ceil(cards.length / per);
+
+    for (var p = 0; p < pages; p++) {
+      var slice = cards.slice(p*per, p*per+per);
+
+      // front page — words
+      slice.forEach(function (c) { host.appendChild(makeCell(c, "front", sz, cols)); });
+      // pad to fill the grid so back-mirror math works
+      for (var e = slice.length; e < per; e++) host.appendChild(blankCell(sz, cols));
+      // hard page break before next sheet
+      host.appendChild(pageBreak());
+
+      // back page — defs, column-mirrored
+      if (printOpts.sides === "double") {
+        var rows = per / cols;
+        for (var r = 0; r < rows; r++) {
+          for (var col = cols-1; col >= 0; col--) {
+            var pos = r*cols + col;
+            host.appendChild(pos < slice.length ? makeCell(slice[pos], "back", sz, cols) : blankCell(sz, cols));
+          }
+        }
+        if (p < pages-1) host.appendChild(pageBreak());
+      }
+    }
+  }
+
+  function makeCell(c, face, sz, cols) {
+    var d = document.createElement("div");
+    d.className = "pcard";
+    // explicit inches: this is what makes 3x5 actually 3x5
+    d.style.width  = sz.w + "in";
+    d.style.height = sz.h + "in";
+    d.style.flex   = "0 0 " + sz.w + "in";
+
+    var single = printOpts.sides === "single";
+    var html = "";
+    if (single) {
+      if (c.photo) html += '<img class="pphoto" src="'+c.photo+'">';
+      html += '<div class="pterm" style="font-size:' + sz.term + '">' + esc(c.term) + '</div>';
+      if (c.def) html += '<div class="pdef" style="font-size:' + sz.def + '">' + esc(c.def) + '</div>';
+    } else if (face === "front") {
+      html += '<div class="pterm" style="font-size:' + sz.term + '">' + esc(c.term) + '</div>';
+    } else {
+      if (c.photo) html += '<img class="pphoto" src="'+c.photo+'">';
+      html += '<div class="pdef" style="font-size:' + sz.def + '">' + esc(c.def || "—") + '</div>';
+    }
+    d.innerHTML = html;
+    return d;
+  }
+  function blankCell(sz, cols) {
+    var d = document.createElement("div");
+    d.className = "pcard blank";
+    d.style.width  = sz.w + "in";
+    d.style.height = sz.h + "in";
+    d.style.flex   = "0 0 " + sz.w + "in";
+    d.style.border = "1px dashed #ccc";
+    return d;
+  }
+  function pageBreak() {
+    var b = document.createElement("div");
+    b.className = "page-break";
+    return b;
+  }
+
+  document.getElementById("printBtn").addEventListener("click", function () {
+    if (!cards.length) {
+      document.getElementById("printCount").textContent = "Build some cards first.";
+      return;
+    }
+    buildPrintSheet();
+    setTimeout(function () { window.print(); }, 80);
+  });
+
+  // ============ QUIZ ============
+  function startQuiz() {
+    var area = document.getElementById("quizArea");
+    if (!cards.length) {
+      area.innerHTML = '<div class="empty">Build some flashcards first, then come back to be quizzed.</div>';
+      return;
+    }
+    var mode = document.getElementById("quizMode").value;
+    deck = cards.slice();
+    if (mode === "photo") {
+      deck = deck.filter(function (c) { return !!c.photo; });
+      if (!deck.length) {
+        area.innerHTML = '<div class="empty">No cards have photos yet. Attach some on the Build tab, or pick another quiz mode.</div>';
+        return;
+      }
+    }
+    shuffle(deck);
+    qi = 0; right = 0; wrong = 0;
+    showQuestion();
+  }
+  function showQuestion() {
+    var area = document.getElementById("quizArea");
+    if (qi >= deck.length) { showResults(); return; }
+    revealed = false;
+    var mode = document.getElementById("quizMode").value;
+    var c = deck[qi];
+    var promptHTML, answerText, label;
+    if (mode === "photo") {
+      label = "What word is this?";
+      promptHTML = '<img class="qphoto" src="'+c.photo+'" alt="">';
+      answerText = c.term + (c.def ? " — " + c.def : "");
+    } else if (mode === "term") {
+      label = "Define this word";
+      promptHTML = '<div class="prompt">' + esc(c.term) + '</div>';
+      answerText = c.def || "(no definition given)";
+    } else {
+      label = "Name this word";
+      promptHTML = '<div class="prompt">' + esc(c.def || "(no definition given)") + '</div>';
+      answerText = c.term;
+    }
+    area.innerHTML =
+      '<div class="quizbox">' +
+        '<div class="progress">Card ' + (qi+1) + ' of ' + deck.length + '</div>' +
+        '<div class="prompt-label">' + label + '</div>' + promptHTML +
+        '<div class="answer" id="ans"></div>' +
+        '<div class="quiz-actions" id="qActions">' +
+          '<button class="btn" id="revealBtn">Reveal Answer</button></div>' +
+        '<div class="scorebar"><span>✓ <b>' + right + '</b> right</span>' +
+        '<span>✕ <b>' + wrong + '</b> missed</span></div>' +
+      '</div>';
+    document.getElementById("revealBtn").addEventListener("click", function () {
+      if (revealed) return;
+      revealed = true;
+      document.getElementById("ans").textContent = answerText;
+      document.getElementById("qActions").innerHTML =
+        '<button class="btn" id="gotIt">I knew it</button>' +
+        '<button class="btn danger" id="missedIt">Didn\'t know</button>';
+      document.getElementById("gotIt").addEventListener("click", function () { right++; qi++; showQuestion(); });
+      document.getElementById("missedIt").addEventListener("click", function () { wrong++; qi++; showQuestion(); });
+    });
+  }
+  function showResults() {
+    var area = document.getElementById("quizArea");
+    var pct = deck.length ? Math.round((right/deck.length)*100) : 0;
+    var note = pct === 100 ? "Perfect run. Eitan, you've earned a break." :
+               pct >= 80 ? "Sharp — one quick review and it's locked in." :
+               pct >= 50 ? "Solid start. Run it again to climb." :
+               "Early days — shuffle and go around again.";
+    area.innerHTML =
+      '<div class="quizbox"><div class="big">' + pct + '%</div>' +
+      '<p style="color:var(--text-dim);font-weight:700;margin:8px 0 20px;">' +
+        right + ' of ' + deck.length + ' recalled · ' + note + '</p>' +
+      '<div class="quiz-actions"><button class="btn" id="againBtn">Quiz Again</button></div></div>';
+    document.getElementById("againBtn").addEventListener("click", startQuiz);
+  }
+  document.getElementById("quizMode").addEventListener("change", startQuiz);
+
+  function shuffle(a) {
+    for (var i = a.length-1; i > 0; i--) {
+      var j = Math.floor(Math.random()*(i+1));
+      var t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, function (ch) {
+      return { "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[ch];
+    });
+  }
+
+  updatePrintInfo();
+})();
+</script>
+</body>
+</html>
